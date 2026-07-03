@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+
+# Development image: installs dev/test gems and expects the app source to be
+# bind-mounted at /rails by docker-compose.yml, so code changes reload live.
+
+ARG RUBY_VERSION=4.0.5
+FROM docker.io/library/ruby:$RUBY_VERSION-slim
+
+WORKDIR /rails
+
+# Install base + build packages (build tools are kept in this image, unlike
+# the production Dockerfile, since native gems may need recompiling locally)
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y \
+      build-essential curl default-libmysqlclient-dev default-mysql-client \
+      git libjemalloc2 libvips libyaml-dev pkg-config && \
+    ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+ENV RAILS_ENV="development" \
+    BUNDLE_PATH="/usr/local/bundle" \
+    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+
+COPY . .
+
+RUN chmod +x bin/* && \
+    sed -i "s/\r$//g" bin/* && \
+    sed -i 's/ruby\.exe$/ruby/' bin/*
+
+EXPOSE 3000
+
+CMD ["ruby", "bin/rails", "server", "-b", "0.0.0.0"]
