@@ -1,12 +1,12 @@
 class PricesController < ApplicationController
   def show
-    price = Coingecko::CoinPriceFetcher.new(symbol_params[:symbol]).call
+    symbol = symbol_params[:symbol].to_s.upcase
+    cached = Coingecko::CoinPriceFetcher.new(symbol).call
 
-    Rails.logger.info "#{symbol_params[:symbol]} ---  #{price}"
-    if price.nil?
+    if cached.nil?
       render json: { error: "Price not available yet" }, status: :not_found
     else
-      render json: price
+      render json: PriceSerializer.new(symbol: symbol, price: cached[:price])
     end
   end
 
